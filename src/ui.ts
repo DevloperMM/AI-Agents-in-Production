@@ -1,6 +1,6 @@
 import ora from 'ora'
+import { createInterface } from 'node:readline/promises'
 import type { AIMessage } from '../types'
-import { generateImageToolDefinition } from './tools/generateImage'
 
 export const showLoader = (text: string) => {
   const spinner = ora({
@@ -45,8 +45,6 @@ export const logMessage = (message: AIMessage) => {
       message.tool_calls.forEach((tool: any) => {
         console.log(`\n${color}[ASSISTANT]${reset}`)
         console.log(`${tool.function.name}\n`)
-
-        // TODO: Ask for approval
       })
       return
     }
@@ -57,4 +55,21 @@ export const logMessage = (message: AIMessage) => {
       console.log(`${message.content}\n`)
     }
   }
+}
+
+export const askForApproval = async (toolName: string): Promise<boolean> => {
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  })
+
+  const answer = await rl.question(
+    `\nDo you want to allow the tool '${toolName}' to run? (y/n): `,
+  )
+
+  rl.close()
+
+  return (
+    answer.trim().toLowerCase() === 'y' || answer.trim().toLowerCase() === 'yes'
+  )
 }
