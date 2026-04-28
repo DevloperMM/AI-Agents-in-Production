@@ -63,13 +63,18 @@ export const askForApproval = async (toolName: string): Promise<boolean> => {
     output: process.stdout,
   })
 
-  const answer = await rl.question(
-    `\nDo you want to allow the tool '${toolName}' to run? (y/n): `,
-  )
+  while (true) {
+    const answer = (
+      await rl.question(
+        `\nDo you want to allow the tool '${toolName}' to run? (y/n): `,
+      )
+    )
+      .trim()
+      .toLowerCase()
 
-  rl.close()
-
-  return (
-    answer.trim().toLowerCase() === 'y' || answer.trim().toLowerCase() === 'yes'
-  )
+    if (answer === 'y' || answer === 'n') {
+      rl.close()
+      return answer === 'y'
+    }
+  }
 }

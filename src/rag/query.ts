@@ -36,57 +36,69 @@ const index = new UpstashIndex({})
  * console.log(results);
  */
 
-type MovieMetadata = {
-  title: string
-  year: string
-  genre: string
-  director: string
-  actors: string
-  rating: string
-  votes: string
-  revenue: string
-  metascore: string
-}
+// Partial<Type> is a TypeScript utility type that makes all properties of Type optional.
+// For example:
+// type MovieMetadata = { title: string; year: number; genre: string }
+// type PartialMovie = Partial<MovieMetadata>
+// This allows: const movie: PartialMovie = { title: "Inception" } // year and genre are optional
 
-export const queryMovies = async ({
-  query,
-  filters,
-  topK = 5,
-}: {
-  query: string
-  // Partial lets callers pass only the metadata fields they want to filter by.
-  // By keeping the MovieMetadata type strict, the core definition of a movie remains consistent across the codebase.
-  // When we need to allow flexibility (like passing only certain filters), we use Partial<MovieMetadata> just for that purpose.
-  // This avoids accidentally making all movie objects loosely typed everywhere, which helps maintain type safety.
-  filters?: Partial<MovieMetadata>
-  topK?: number
-}) => {
+export const queryMovies = async ({ args }: { args: Record<string, any> }) => {
+  console.log(args)
+
+  const { query, filters = {}, sort_by, sort_order = 'desc', limit = 5 } = args
+
+  const conditions: string[] = []
+  if (filters) {
+    if (filters.genre) conditions.push(`genre GLOB '*${filters.genre}*'`)
+    if (filters.director) conditions.push(`director = '${filters.director}'`)
+    if (filters.year) conditions.push(`year = '${filters.year}'`)
+    if (filters.actors) conditions.push(`actors GLOB '*${filters.actors}*'`)
+  }
+
   // Build filter string if filters provided
-  /**
-   * let filterStr = ''
-   * if (filters && Object.keys(filters).length > 0) {
-   *   const filterParts = Object.entries(filters)
-   *     .filter(([_, value]) => value !== undefined && value !== '')
-   *     .map(
-   *       ([key, value]) =>
-   *         typeof value === 'number'
-   *           ? `${key}=${value}`
-   *           : `${key}='${String(value).replace(/'/g, "\\'")}'`,
-   *     )
-   *
-   *   if (filterParts.length > 0) {
-   *     filterStr = filterParts.join(' AND ')
-   *   }
-   * }
-   */
+  const filterString =
+    conditions.length > 0 ? conditions.join(' AND ') : undefined
+
+  console.log(filterString)
 
   const results = await index.query({
     data: query,
-    topK,
-    // filter: filterStr,
+    topK: limit,
+    // filter: filterString,
     includeData: true,
     includeMetadata: true,
   })
 
-  return results
+  let sorted = results
+
+  if (sort_by) {
+    sorted = [...results].sort((a, b) => {
+      const aVal = (a.metadata?.[sort_by] ?? 0) as number
+      const bVal = (b.metadata?.[sort_by] ?? 0) as number
+      return sort_order === 'desc' ? bVal - aVal : aVal - bVal
+    })
+  }
+
+  /**
+   * TODO:(1) - Query fining and filter fining; see args for various prompts
+   * TODO:(2) - refer below
+   *
+   * Current issue-
+   * Sorting happens after semantic topK retrieval, so true top-rated/top-grossing
+   * results may never enter the candidate set.
+   *
+   * Next-
+   * [ ] Move sorting into DB (ORDER BY ...)
+   * [ ] Fetch larger sorted candidate pool (limit * N)
+   * [ ] Run semantic search only over those candidates
+   * [ ] Return semantic topK from ranked pool
+   *
+   * Later-
+   * [ ] Consider hybrid score = semantic relevance + sort metric
+   *
+   * Fix-
+   * [ ] Replace metadata?.sort_by with metadata?.[sort_by]
+   */
+
+  return sorted.slice(0, limit)
 }

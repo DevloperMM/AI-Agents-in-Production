@@ -29,7 +29,7 @@ export async function indexMovieData() {
   // Index each movie
   for (const movie of movies as any[]) {
     spinner.text = `Indexing movie: ${movie.Title}`
-    const text = `${movie.Title}. ${movie.Genre}. ${movie.Description}`
+    const text = `${movie.Title} is a ${movie.Genre} film about ${movie.Description} from ${movie.Year}, directed by ${movie.Director}, starring ${movie.Actors}.`
 
     try {
       await index.upsert({
@@ -37,7 +37,7 @@ export async function indexMovieData() {
         data: text, // Text will be automatically embedded
         metadata: {
           title: movie.Title,
-          year: Number(movie.Year),
+          year: movie.Year,
           genre: movie.Genre,
           director: movie.Director,
           actors: movie.Actors,
